@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 *_result.json
 loomy_login_result.json
+loomy_onboarding.json
