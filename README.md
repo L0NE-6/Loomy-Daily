@@ -1,186 +1,238 @@
 <div align="center">
 
+<sub><strong>L0NE-6 · DAILY SIGNAL</strong></sub>
+
 # 🌙 Loomy Daily
 
-**Loomy 每日积分 + 新手任务 · 短信验证码登录 · 单文件青龙脚本 · 多账号**
+**刷新 Loomy 每日赠送积分，并领取 8 项新手任务奖励的单文件自动化脚本。**
 
-<img src="https://img.shields.io/github/v/release/L0NE-6/Loomy-Daily?style=flat-square&label=Release&color=2ea44f" />
-<img src="https://img.shields.io/github/stars/L0NE-6/Loomy-Daily?style=flat-square&label=Stars&color=FFC75F" />
-<img src="https://img.shields.io/badge/Python-3.8%2B-3776AB?style=flat-square&logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/%E9%9D%92%E9%BE%99%E9%9D%A2%E6%9D%BF-%E5%8D%95%E6%96%87%E4%BB%B6%E8%BF%90%E8%A1%8C-4EAA25?style=flat-square" />
-<img src="https://img.shields.io/badge/GitHub%20Actions-%E6%94%AF%E6%8C%81-2088FF?style=flat-square&logo=githubactions&logoColor=white" />
-<img src="https://img.shields.io/badge/%E5%A4%9A%E8%B4%A6%E5%8F%B7-%E6%8D%A2%E8%A1%8C%E6%88%96%20%26%20%E5%88%86%E9%9A%94-8957E5?style=flat-square" />
-<img src="https://img.shields.io/badge/License-MIT-F472B6?style=flat-square" />
+[简体中文](README.md) · [English](docs/README.en.md) · [繁體中文](docs/README.zh-Hant.md) · [日本語](docs/README.ja.md) · [한국어](docs/README.ko.md) · [Português (BR)](docs/README.pt-BR.md)
+
+<p>
+  <img src="https://img.shields.io/github/v/release/L0NE-6/Loomy-Daily?style=for-the-badge&label=Release&color=2ea44f&logo=github" alt="Release" />
+  <img src="https://img.shields.io/github/stars/L0NE-6/Loomy-Daily?style=for-the-badge&label=Stars&color=FFC75F&logo=github" alt="Stars" />
+  <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.8+" />
+  <img src="https://img.shields.io/badge/%E9%9D%92%E9%BE%99-%E5%8D%95%E6%96%87%E4%BB%B6-4EAA25?style=for-the-badge" alt="Qinglong" />
+  <img src="https://img.shields.io/badge/GitHub%20Actions-Supported-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions" />
+  <img src="https://img.shields.io/badge/License-MIT-F472B6?style=for-the-badge" alt="MIT License" />
+  <a href="https://github.com/L0NE-6/Loomy-Daily/releases"><img src="https://img.shields.io/badge/%E2%AC%87%20Download-Releases-2ea44f?style=for-the-badge&logo=github" alt="Download Releases" /></a>
+</p>
+
+[✨ 30 秒速览](#quick-overview) · [🚀 青龙部署](#quick-boot) · [☁️ Actions](#actions) · [🔐 获取 Session](#credentials) · [🔧 环境变量](#environment) · [✅ 成功判据](#result) · [❓ FAQ](#faq) · [✦ 星轨](#star-trail)
 
 </div>
 
 ---
 
-## ✨ 这是什么
+<a id="quick-overview"></a>
 
-Loomy 每日签到：调用每日首次登录接口刷新赠送积分，并顺手领取新手任务奖励，全流程无人值守。
+## ✨ 30 秒速览
 
-> 🎯 一句话：**配好 Token，剩下的交给它。**
->
-> 📦 单文件自包含：不需要额外模块，青龙上传脚本、填好环境变量就能跑。
->
-> ☁️ 除了青龙，也可以直接跑在 **GitHub Actions** 上，零服务器定时执行（见下文部署方式二）。
+| 维度 | 说明 |
+| :--- | :--- |
+| **用途** | 刷新 Loomy 每日赠送积分，并领取已完成的新手任务奖励。 |
+| **输入** | `LOOMY_TOKENS`；可选 `LOOMY_ONBOARDING=0` 关闭新手任务。 |
+| **输出** | 分账号积分刷新状态、任务到账明细、累计进度与待处理项。 |
+| **部署** | 青龙面板、GitHub Actions，或本地 Python 运行。 |
+| **依赖** | Python 3.8+，仅需 `requests`。 |
+| **成功判据** | 每日接口返回业务码 `000000` 并确认积分刷新；任务以接口成功回执和任务清单进度为准。 |
 
-核心特性：
+<a id="signals"></a>
 
-- ✅ **每日积分刷新**：按天幂等，重复运行不重复领
-- 🎁 **新手任务领取**：一键领取已完成的新手任务奖励
-- 🧾 **领完不再空跑**：8 项一次性福利全部结清后记在本机，之后不再重复查询（`--refresh` 可强制实查）
-- 📱 **短信验证码登录**：输入手机号 + 验证码直接拿 session
-- 👥 **多账号** + 📢 **多渠道推送** + 🐧 **青龙 / Actions 双部署**
+## 🎯 核心能力
+
+- ✅ **每日积分刷新**：调用每日首次登录接口，按天幂等刷新赠送积分。
+- 🎁 **新手任务领取**：逐项上报 8 个任务，全部完成后累计可达 10000 分。
+- 🧾 **本地结清记录**：8 项全部结清后写本机快照，之后默认不再重复查询。
+- 🔍 **任务诊断**：`--tasks` 查看清单与进度，`--claim KEY` 单独处理某个任务。
+- ♻️ **强制实查**：`--refresh` 忽略本地结清快照并重新读取上游。
+- 📱 **短信登录**：手机号与验证码直接换取 session。
+- 👥 **多账号与推送**：支持换行 / `&` 分隔账号，以及五种通知渠道。
+
+## 🧩 工作方式
+
+```text
+POST /api/v1/points/first-login
+GET  /api/v1/onboarding/tasks
+POST /api/v1/onboarding/tasks/complete
+```
+
+Loomy 没有独立的传统签到接口，“每日赠送积分”由每日首次登录行为触发。新手任务默认随签到一并领取；重复运行只处理未结清项，不会重复加分。
 
 ## 📦 文件说明
 
-| 文件 | 作用 |
-|---|---|
-| `loomy_login.py` | 手机号 + 短信验证码登录 |
-| `loomy_daily.py` | 每日积分刷新 + 新手任务领取 |
+| 文件 | 用途 |
+| :--- | :--- |
+| `loomy_login.py` | 手机号 + 短信验证码登录，输出 `备注\|session` |
+| `loomy_daily.py` | 每日积分刷新与新手任务领取 |
+| `requirements.txt` | Python 依赖清单 |
 
-## ⬇️ 下载
+<a id="quick-boot"></a>
 
-不想用 git？直接到 **[Releases](https://github.com/L0NE-6/Loomy-Daily/releases)** 下载：
+## 🚀 青龙部署
 
-- 完整包 zip（脚本 + 登录工具 + README + Actions 工作流 + 收款码）
-- 各脚本单文件（青龙只需要上传签到脚本）
-- `SHA256SUMS.txt` 完整性校验
+1. 安装依赖：`python3 -m pip install -r requirements.txt`。
+2. 上传 `loomy_daily.py` 到青龙「脚本管理」。
+3. 在「环境变量」添加 `LOOMY_TOKENS`。
+4. 使用青龙运行器建立定时任务。
 
-## 🚀 部署方式一：青龙面板（三步）
-
-| 步骤 | 操作 |
-| :---: | :--- |
-| 1 | 安装依赖：`pip install -r requirements.txt`（或 `pip3 install requests`） |
-| 2 | 把签到脚本上传到青龙「脚本管理」，或把仓库放进脚本目录 |
-| 3 | 「环境变量」里添加 Token，新建定时任务（见下方 cron 示例） |
-
-```cron
-45 8 * * * python loomy_daily.py
+```text
+# 每天北京时间 08:45
+45 8 * * * task loomy_daily.py
 ```
 
-## ☁️ 部署方式二：GitHub Actions（可选，默认手动触发）
+只签到、不领取新手任务：
 
-1. Fork 本仓库（或直接使用本仓库，Secrets 只能配在你自己的仓库里）。
-2. 打开 **Settings → Secrets and variables → Actions**，添加下表里的 Secrets。
-3. 打开 **Actions** 标签页，选择 `Loomy Daily`，点 **Run workflow** 手动跑一次验证。
-4. 默认只支持**手动触发**（上游仓库不跑定时，避免空跑）；fork 后想定时，把 `.github/workflows/daily.yml` 里 `schedule:` 两行取消注释（cron 用 UTC，北京时间减 8 小时），之后就会按该时间自动执行。
+```text
+45 8 * * * task loomy_daily.py --no-onboarding
+```
 
-| Secret | 对应环境变量 | 必填 |
-|---|---|---|
-| `LOOMY_TOKENS` | LOOMY_TOKENS | 必填 |
-| `PUSHPLUS_TOKEN` / `BARK_URL` / `WECOM_WEBHOOK` / `DINGTALK_WEBHOOK` / `DINGTALK_SECRET` | 同名推送变量 | 可选 |
+或在青龙环境变量中设置 `LOOMY_ONBOARDING=0`。
 
-> 公开仓库的 Secrets 是加密的，日志里不会回显；脚本也不会把 Token 写进仓库文件。
+<a id="actions"></a>
 
-## 🔑 获取 Token
+## ☁️ GitHub Actions
+
+1. Fork 或导入仓库到自己的账号。
+2. 在 **Settings → Secrets and variables → Actions** 新建 Secrets。
+3. 从 **Actions → Loomy Daily → Run workflow** 手动验证。
+4. 默认仅手动触发；需要定时时，在 `.github/workflows/daily.yml` 取消 `schedule:` 两行注释。cron 使用 UTC。
+
+| Secret | 必填 | 说明 |
+| :--- | :---: | :--- |
+| `LOOMY_TOKENS` | 是 | 多账号 session |
+| `PUSHPLUS_TOKEN` / `BARK_URL` | 可选 | PushPlus / Bark |
+| `WECOM_WEBHOOK` / `DINGTALK_WEBHOOK` / `DINGTALK_SECRET` | 可选 | 企业微信 / 钉钉 |
+
+<a id="credentials"></a>
+
+## 🔐 获取 Session
 
 ```bash
 python loomy_login.py
+python loomy_login.py 13800000000 123456 --note 主号
+python loomy_login.py --verify
 ```
 
-输入手机号和收到的 6 位验证码，工具输出一行 `备注|session`，粘贴进 `LOOMY_TOKENS`。
+工具使用同一次 `msgid` 完成发码与登录，输出一行 `备注|session`，保存到本机 `loomy_login_result.json`。也可以从桌面端集成网关请求的 `token` 头取得 session。
 
-> 发码与登录必须使用同一次 `msgid`，登录工具已经自动串好。
->
-> 备选方式：桌面端抓包里取集成网关请求的 `token` 头，那一串就是 session。
+Session 通常约 14 天失效。失效后重新登录并替换 `LOOMY_TOKENS` 中对应账号即可。
 
-## 🧩 环境变量（支持多账号）
+<a id="environment"></a>
 
-> 多账号用 **换行** 或 **`&`** 分隔，两种可以混用。`|` 是单条账号内部的字段分隔符，备注里不要再写 `|`。
+## 🔧 环境变量与参数
 
-| 环境变量 | 单条格式 | 说明 |
-|---|---|---|
-| `LOOMY_TOKENS` | `session` / `备注\|session` | 多账号换行或 `&` |
+多账号使用换行或 `&` 分隔。每条账号可写 `session` 或 `备注|session`，备注中不要包含 `|`。
 
-## ⌨️ 命令行参数
+| 环境变量 | 格式 | 说明 |
+| :--- | :--- | :--- |
+| `LOOMY_TOKENS` | `session` / `备注\|session` | 必填，多账号换行或 `&` |
+| `LOOMY_ONBOARDING` | `1` / `0` | 是否领取新手任务，默认 `1` |
+| `PUSHPLUS_TOKEN` / `BARK_URL` | Token / URL | 可选推送 |
+| `WECOM_WEBHOOK` / `DINGTALK_WEBHOOK` / `DINGTALK_SECRET` | Webhook / 加签密钥 | 可选推送 |
+| `QL_URL` / `QL_TOKEN` | 面板地址 / 旧版面板 Token | 可选青龙通知 |
 
 | 参数 | 作用 |
-|---|---|
-| `--no-onboarding` | 只签到，不领新手任务 |
-| `--tasks` | 只看任务清单与进度，不签到 |
-| `--claim KEY` | 单独上报领取某个任务 |
-| `--refresh` | 忽略本地结算记录，强制实查 |
+| :--- | :--- |
+| `--no-onboarding` | 只刷新每日积分，不领新手任务 |
+| `--tasks` | 只查看任务清单与进度 |
+| `--claim KEY` | 单独上报并领取指定任务 |
+| `--refresh` | 忽略本地结清快照，强制实查 |
 | `--only 2` | 只跑第 2 个账号 |
-| `--no-notify` | 关闭推送 |
+| `--no-notify` | 关闭本轮推送 |
 
-## 📊 运行效果示例
+<a id="result"></a>
+
+## ✅ 成功判据与输出
+
+- 每日积分接口必须返回业务码 `000000`，有余额时报告服务端返回的 `dailyBalance`。
+- 新手任务逐项上报；成功、此前已完成、失败会分别标记。
+- 任务清单与本地结算快照用于判断是否全部结清，不把单个 HTTP 200 当作任务完成。
+- 登录失效会明确提示重新登录，不持续用坏 session 空跑。
 
 ```text
 [08:45:01] 👤 [1] 主号  session=abc1****wxyz
 [08:45:02]    ✅ 每日赠送积分已刷新（当前 5000）；新手任务 +2 项：发送你的第一条消息+500、试试选择一个技能+1000
 ```
 
-## 🗂️ 数据文件说明
+<a id="data-privacy"></a>
+
+## 🗂️ 数据文件与隐私
 
 | 文件 | 内容 | 是否提交 |
-|---|---|---|
-| `loomy_login_result.json` | 登录工具保存的登录记录 | 已忽略 |
-| `loomy_onboarding.json` | 新手任务结算记录（只存任务快照与会话指纹，不含 Token） | 已忽略 |
+| :--- | :--- | :---: |
+| `loomy_login_result.json` | 登录记录，含手机号与 session | 否，已忽略 |
+| `loomy_onboarding.json` | 任务进度与不可逆 session 指纹 | 否，已忽略 |
 
-> 登录记录包含账号凭据；结算记录只含任务快照与不可逆的会话指纹。两者都在 `.gitignore` 中排除，**不要手动提交**。
+- 仓库不内置账号、手机号、session 或用户 ID。
+- 凭据由环境变量或 GitHub Secrets 注入。
+- Issue 中请使用脱敏日志，不要粘贴 session、手机号或本地状态文件。
+
+<a id="faq"></a>
 
 ## ❓ 常见问题
 
-- **session 多久过期？** 约 14 天，过期重新登录一次即可。
-- **验证码收不到？** 不要连续点击发送；等一会儿或换时间段重试。
-- **新手任务都能自动领吗？** 脚本对未完成的条目逐条上报，接口幂等：已领过的不会重复加分。全部结清后会在本机记一笔，之后不再重复查询；本地记录误删或想强制实查用 `--refresh`。
+**session 多久过期？**
+登录请求按 14 天有效期申请 session；失效后重新执行 `loomy_login.py`。
 
-## 📁 目录结构
+**验证码收不到？**
+避免连续快速发码，稍后重试或更换时间段。
 
-```text
-Loomy-Daily/
-├── loomy_login.py
-├── loomy_daily.py
-├── assets/
-├── .github/workflows/daily.yml
-├── CHANGELOG.md
-├── LICENSE
-├── README.md
-└── requirements.txt
-```
+**新手任务都会自动领吗？**
+脚本会逐项上报 8 个任务，接口按幂等方式处理。全部结清后写入本机；误删记录或想强制实查时使用 `--refresh`。
+
+**为什么显示“已结清”但没有请求？**
+本机快照记录到 8/8 已完成。默认直接使用快照，`--refresh` 可重新读取上游。
+
+<a id="release"></a>
 
 ## 📦 版本与发布
 
-- 每次更新单独发一个 Release：`v1.0.0` → `v1.0.1` …，历史版本保留可下载。
-- 每个 Release 附带：完整包 zip + 各脚本单文件 + `SHA256SUMS.txt`。
-- 下载页：<https://github.com/L0NE-6/Loomy-Daily/releases>
+当前 CHANGELOG 记录最新版本为 `v1.0.2`（2026-10-10）。每个版本单独发布 Release，附完整包、脚本单文件与 `SHA256SUMS.txt`。下载页：[Releases](https://github.com/L0NE-6/Loomy-Daily/releases)。
 
-## 🔒 隐私说明
+## ⚠️ 说明
 
-- 脚本**不含任何账号、手机号、Token 或设备信息**，全部由环境变量（或 GitHub Secrets）注入。
-- 运行期生成的数据文件（见「数据文件说明」）都包含凭据，已被 `.gitignore` 排除。
-- 请勿把 Token 写进脚本、提交到仓库或发到 Issue 里。
+本项目用于学习与个人自动化。请遵守对应平台的服务条款，并自行承担运行风险。
 
-## ⚠️ 免责声明
+<a id="support"></a>
 
-本项目仅供**学习与个人自动化**使用。请遵守对应平台的服务条款，使用风险自负。
+## ☕ 支持与反馈
 
-## ☕ 支持与投喂
+脚本完全免费，支持不影响任何功能。
 
-脚本是**完全免费、无广告、无功能限制**的，仓库与发布包也不含你的任何数据。
-如果它确实帮你省了时间，欢迎请我喝杯咖啡 —— **纯自愿，不影响任何功能**。
+- [提交 Issue](https://github.com/L0NE-6/Loomy-Daily/issues)：请附运行日志、复现步骤与脱敏后的错误。
+- [发起 Pull Request](https://github.com/L0NE-6/Loomy-Daily/pulls)：欢迎修复、测试与文档贡献。
+- [点一个 Star](https://github.com/L0NE-6/Loomy-Daily)：让更多使用者找到这个项目。
 
 <p align="center">
   <img src="assets/donate-wechat.png" width="240" alt="微信赞赏码" />
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/donate-alipay.jpg" width="240" alt="支付宝收款码" />
 </p>
-<p align="center"><sub>💚 微信支付（左） &nbsp;|&nbsp; 💙 支付宝（右）</sub></p>
+<p align="center"><sub>微信支付（左） · 支付宝（右）</sub></p>
 
-> 💡 **不花钱也能帮上忙**：点个 ⭐ Star、提一个带日志的 Issue、发一个 Pull Request，或者把脚本分享给需要的朋友。
+<a id="star-trail"></a>
 
-## 💬 反馈与贡献
+## ✦ 星轨 Star Trail
 
-- 提交 [Issue](https://github.com/L0NE-6/Loomy-Daily/issues)：报 bug、提需求
-- 发起 [Pull Request](https://github.com/L0NE-6/Loomy-Daily/pulls)：直接贡献代码
+> 每日积分像月相循环，稳定的自动化则让每一轮都留下可回看的轨迹。
 
-> 提 Issue 时附上**运行日志**和**复现步骤**，定位会快很多。
+<a href="https://star-history.com/#L0NE-6/Loomy-Daily&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=L0NE-6/Loomy-Daily&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=L0NE-6/Loomy-Daily&type=Date&theme=light" />
+    <img alt="Loomy Daily Star Trail" src="https://api.star-history.com/svg?repos=L0NE-6/Loomy-Daily&type=Date&theme=light" />
+  </picture>
+</a>
 
 ---
 
 <div align="center">
-  <sub>🌙 如果这个脚本帮到你，点个 <b>Star</b> 支持一下，或者到 <a href="#-支持与投喂">支持与投喂</a> 请我喝杯咖啡 ✨</sub>
+  <sub>L0NE-6 · DAILY SIGNAL</sub>
+  <br />
+  <a href="https://github.com/L0NE-6/Loomy-Daily/releases">Releases</a>
+  ·
+  <a href="https://github.com/L0NE-6/Loomy-Daily/issues">Issues</a>
+  ·
+  <a href="https://github.com/L0NE-6/Loomy-Daily">Star</a>
 </div>
