@@ -205,8 +205,9 @@ Session 通常约 14 天失效。失效后重新登录并替换 `LOOMY_TOKENS` �
 <a id="release"></a>
 
 ## 📦 版本与发布
+- 当前发布版：`v1.0.3`（2026-11-04，文档发行版；脚本逻辑仍为 `v1.0.2`）。
 
-当前 CHANGELOG 记录最新版本为 `v1.0.2`（2026-10-10）。每个版本单独发布 Release，附完整包、脚本单文件与 `SHA256SUMS.txt`。下载页：[Releases](https://github.com/L0NE-6/Loomy-Daily/releases)。
+当前 CHANGELOG 记录最新版本为 `v1.0.3`（2026-11-04）。每个版本单独发布 Release，附完整包、脚本单文件与 `SHA256SUMS.txt`。下载页：[Releases](https://github.com/L0NE-6/Loomy-Daily/releases)。
 
 ## ⚠️ 说明
 
