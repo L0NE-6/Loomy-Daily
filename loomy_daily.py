@@ -8,6 +8,9 @@
    1. POST /api/v1/points/first-login          刷新每日赠送积分（按天幂等）
    2. GET  /api/v1/onboarding/tasks            读新手任务完成表
    3. POST /api/v1/onboarding/tasks/complete   逐个领取未完成任务（共 8 项 / 10000 分）
+   4. GET  /api/v1/onboarding/tasks            再次回读状态与积分增量
+   只有回读确认 done=true 且 earned 增量匹配，才把领取结果算作成功；
+   无变化记为 pending，回读失败记为 unconfirmed。
    新手任务默认领取，可用 --no-onboarding 或 LOOMY_ONBOARDING=0 关闭。
    8 项全部领完后会把结算记录写在本机，之后不再重复查询；--refresh 可强制实查。
 
@@ -255,6 +258,95 @@ def claim_task(session_token, key):
     return True, already, ""
 
 
+def _attempt_record(key, title, points, reported, already, error):
+    return {"key": key, "title": title, "points": points,
+            "reported": bool(reported), "already": bool(already),
+            "postError": str(error)[:120] if error else ""}
+
+
+def _unconfirmed_payload(before, attempts, error):
+    """上报结果无法由回读证实：保留 before 快照，明确标记 unconfirmed。"""
+    refresh_error = str(error)[:160]
+    before_done = {row["key"]: bool(row.get("done")) for row in before.get("tasks") or []}
+    results = []
+    for attempt in attempts:
+        result = dict(attempt)
+        result.update({"ok": False, "status": "unconfirmed",
+                       "beforeDone": before_done.get(attempt["key"], False),
+                       "afterDone": None, "refreshError": refresh_error})
+        results.append(result)
+    payload = dict(before)
+    payload.update({
+        "results": results,
+        "claimed": 0,
+        "failed": 0,
+        "postFailures": len([row for row in attempts if not row["reported"]]),
+        "pending": 0,
+        "unconfirmed": len(results),
+        "claimedPoints": 0,
+        "settled": False,
+        "readbackOk": False,
+        "readbackError": refresh_error,
+        "verification": "unconfirmed",
+        "snapshotSource": "before",
+        "earnedBefore": before.get("earned"),
+        "earnedAfter": None,
+        "earnedDelta": None,
+    })
+    return results, payload
+
+
+def _verify_claim_attempts(before, after, attempts):
+    """以领取后的 GET 为唯一成功依据，并返回逐项确认结果。"""
+    before_done = {row["key"]: bool(row.get("done")) for row in before.get("tasks") or []}
+    after_done = {row["key"]: bool(row.get("done")) for row in after.get("tasks") or []}
+    transitions = set()
+    expected_points = 0
+    for attempt in attempts:
+        key = attempt["key"]
+        if not before_done.get(key, False) and after_done.get(key, False):
+            transitions.add(key)
+            expected_points += attempt["points"]
+
+    earned_before = int(before.get("earned") or 0)
+    earned_after = int(after.get("earned") or 0)
+    earned_delta = earned_after - earned_before
+    points_confirmed = earned_delta >= expected_points
+
+    results = []
+    for attempt in attempts:
+        result = dict(attempt)
+        key = attempt["key"]
+        changed = key in transitions
+        result["beforeDone"] = before_done.get(key, False)
+        result["afterDone"] = after_done.get(key, False)
+        if changed and points_confirmed:
+            result.update({"ok": True, "status": "confirmed", "error": ""})
+        elif changed:
+            result.update({
+                "ok": False,
+                "status": "unconfirmed",
+                "error": "回读任务已完成，但 earned 增量 %d 小于预期 %d"
+                         % (earned_delta, expected_points),
+            })
+        else:
+            result.update({
+                "ok": False,
+                "status": "pending",
+                "error": attempt.get("postError") or "领取接口成功，但回读任务状态未变化",
+            })
+        results.append(result)
+    return results, expected_points, earned_delta
+
+
+def _verification_name(results):
+    if any(row.get("status") == "unconfirmed" for row in results):
+        return "unconfirmed"
+    if any(row.get("status") == "pending" for row in results):
+        return "partial" if any(row.get("ok") for row in results) else "pending"
+    return "confirmed"
+
+
 def onboarding_view(session_token, refresh=False):
     """清单查询入口：已结清直接给本地记录（零请求），否则实查并同步记录。"""
     state = load_state()
@@ -267,60 +359,157 @@ def onboarding_view(session_token, refresh=False):
 
 
 def claim_onboarding(session_token, refresh=False):
-    """一键领取未完成任务。返回 (新到账摘要, 失败列表, 明细)。"""
+    """一键领取；POST 后重新 GET，只把回读确认项计入成功。"""
     state = load_state()
     previous = settled_snapshot(state, session_token)
     if previous and not refresh:
         return [], [], settled_view(previous)
     before = fetch_onboarding(session_token)
     done = {row["key"]: row["done"] for row in before["tasks"]}
-    newly, failed, results = [], [], []
-    claimed_points = 0
+    attempts, failed = [], []
     for _group, key, title, points in TASKS:
         if done.get(key):
             continue
         try:
             ok, already, message = claim_task(session_token, key)
         except Exception as error:
-            failed.append("%s(%s)" % (title, str(error)[:40]))
-            results.append({"key": key, "ok": False, "error": str(error)[:80]})
-            time.sleep(1.0)
-            continue
+            ok, already, message = False, False, str(error)
         if not ok:
             failed.append("%s(%s)" % (title, message[:40]))
-            results.append({"key": key, "ok": False, "error": message[:80]})
-            time.sleep(1.0)
-            continue
-        done[key] = True
-        claimed_points += points
-        results.append({"key": key, "ok": True, "already": already, "points": points})
-        newly.append("%s（此前已完成）" % title if already else "%s+%d" % (title, points))
+        attempts.append(_attempt_record(key, title, points, ok, already, message))
         time.sleep(1.0)
-    rows, earned, unclaimed = task_rows(done)
-    payload = {"results": results,
-               "claimed": len([row for row in results if row.get("ok")]),
-               "failed": len(failed), "claimedPoints": claimed_points,
-               "tasks": rows, "earned": earned, "total": TOTAL_POINTS,
-               "unclaimed": unclaimed, "settled": unclaimed == 0}
-    remember(state, session_token, payload, None)
+
+    if not attempts:
+        payload = dict(before)
+        payload.update({
+            "results": [],
+            "claimed": 0,
+            "failed": 0,
+            "postFailures": 0,
+            "pending": 0,
+            "unconfirmed": 0,
+            "claimedPoints": 0,
+            "readbackOk": True,
+            "verification": "confirmed",
+            "earnedBefore": before.get("earned"),
+            "earnedAfter": before.get("earned"),
+            "earnedDelta": 0,
+        })
+        remember(state, session_token, payload, previous)
+        return [], [], payload
+
+    try:
+        after = fetch_onboarding(session_token)
+    except Exception as error:
+        _results, payload = _unconfirmed_payload(before, attempts, error)
+        return [], failed, payload
+
+    results, _expected_points, earned_delta = _verify_claim_attempts(before, after, attempts)
+    confirmed = [row for row in results if row.get("ok")]
+    pending = [row for row in results if row.get("status") == "pending"]
+    unconfirmed = [row for row in results if row.get("status") == "unconfirmed"]
+    newly = ["%s（此前已完成）" % row["title"] if row.get("already")
+             else "%s+%d" % (row["title"], row["points"]) for row in confirmed]
+    payload = dict(after)
+    payload.update({
+        "results": results,
+        "claimed": len(confirmed),
+        "failed": len([row for row in results if row.get("status") == "failed"]),
+        "postFailures": len(failed),
+        "pending": len(pending),
+        "unconfirmed": len(unconfirmed),
+        "claimedPoints": sum(row["points"] for row in confirmed),
+        "readbackOk": True,
+        "verification": _verification_name(results),
+        "earnedBefore": before.get("earned"),
+        "earnedAfter": after.get("earned"),
+        "earnedDelta": earned_delta,
+    })
+    remember(state, session_token, payload, previous)
     return newly, failed, payload
 
 
 def claim_single(session_token, key, refresh=False):
-    """单独领取某个 key（幂等上报，不依赖清单里那一行是否勾选）。"""
+    """单独领取某个 key；POST 后重新 GET，以状态和积分增量确认。"""
     state = load_state()
     previous = settled_snapshot(state, session_token)
     if previous and not refresh:
         return settled_view(previous)
-    ok, already, message = claim_task(session_token, key)
-    payload = {"key": key, "ok": ok, "already": already, "error": message}
-    if ok:
-        try:
-            view = fetch_onboarding(session_token)
-            remember(state, session_token, view, previous)
-            payload.update(view)
-        except Exception as error:
-            payload["refreshError"] = str(error)[:80]
+    before = fetch_onboarding(session_token)
+    task = next((item for item in TASKS if item[1] == key), None)
+    if task is None:
+        return {"key": key, "ok": False, "status": "failed",
+                "error": "未知任务 key：%s" % key}
+    _group, _key, title, points = task
+    before_rows = {row["key"]: row for row in before.get("tasks") or []}
+    if before_rows.get(key, {}).get("done"):
+        payload = dict(before)
+        result = {"key": key, "title": title, "points": 0, "reported": False,
+                  "already": True, "postError": "", "ok": True,
+                  "status": "already_done", "beforeDone": True,
+                  "afterDone": True, "error": ""}
+        payload.update({
+            "key": key,
+            "ok": True,
+            "status": "already_done",
+            "already": True,
+            "reported": False,
+            "points": 0,
+            "claimedPoints": 0,
+            "results": [result],
+            "claimed": 0,
+            "failed": 0,
+            "postFailures": 0,
+            "pending": 0,
+            "unconfirmed": 0,
+            "readbackOk": True,
+            "verification": "already_done",
+            "earnedBefore": before.get("earned"),
+            "earnedAfter": before.get("earned"),
+            "earnedDelta": 0,
+        })
+        remember(state, session_token, payload, previous)
+        return payload
+
+    try:
+        ok, already, message = claim_task(session_token, key)
+    except Exception as error:
+        ok, already, message = False, False, str(error)
+    attempt = _attempt_record(key, title, points, ok, already, message)
+    try:
+        after = fetch_onboarding(session_token)
+    except Exception as error:
+        _results, payload = _unconfirmed_payload(before, [attempt], error)
+        payload["key"] = key
+        return payload
+
+    results, _expected_points, earned_delta = _verify_claim_attempts(before, after, [attempt])
+    result = results[0]
+    payload = dict(after)
+    payload.update({
+        "key": key,
+        "ok": result["ok"],
+        "status": result["status"],
+        "already": result.get("already", False),
+        "reported": result.get("reported", False),
+        "points": points,
+        "claimedPoints": points if result["ok"] else 0,
+        "error": result.get("error", ""),
+        "results": results,
+        "claimed": 1 if result["ok"] else 0,
+        "failed": 0,
+        "postFailures": 0 if result.get("reported") else 1,
+        "pending": 1 if result["status"] == "pending" else 0,
+        "unconfirmed": 1 if result["status"] == "unconfirmed" else 0,
+        "readbackOk": True,
+        "verification": result["status"],
+        "earnedBefore": before.get("earned"),
+        "earnedAfter": after.get("earned"),
+        "earnedDelta": earned_delta,
+    })
+    if result.get("postError"):
+        payload["postError"] = result["postError"]
+    remember(state, session_token, payload, previous)
     return payload
 
 
@@ -344,7 +533,10 @@ def do_checkin(account):
             newly, failed, payload = claim_onboarding(account["session"], refresh=FORCE_REFRESH)
             earned = payload.get("earned")
             total = payload.get("total")
-            if payload.get("settled") and not failed:
+            pending_count = int(payload.get("pending") or 0)
+            unconfirmed_count = int(payload.get("unconfirmed") or 0)
+            post_failures = int(payload.get("postFailures") or 0)
+            if payload.get("settled") and not pending_count and not unconfirmed_count:
                 if newly:
                     parts.append("新手任务 +%d 项：%s（累计 %s/%s）"
                                  % (len(newly), "、".join(newly[:4]), earned, total))
@@ -352,9 +544,12 @@ def do_checkin(account):
                     parts.append("新手任务已结清（本地记录，累计 %s/%s）" % (earned, total))
                 else:
                     parts.append("新手任务已全部完成（累计 %s/%s）" % (earned, total))
-            elif failed:
-                parts.append("新手任务待处理 %d 项（失败 %d 项）"
-                             % (payload.get("unclaimed", 0), len(failed)))
+            elif unconfirmed_count:
+                parts.append("新手任务回读未确认 %d 项（待处理 %d 项，上报异常 %d 项）"
+                             % (unconfirmed_count, payload.get("unclaimed", 0), post_failures))
+            elif pending_count or failed:
+                parts.append("新手任务待处理 %d 项（回读无变化 %d 项，上报异常 %d 项）"
+                             % (payload.get("unclaimed", 0), pending_count, post_failures))
             else:
                 parts.append("新手任务待处理 %d 项" % payload.get("unclaimed", 0))
         except Exception as error:
@@ -537,10 +732,21 @@ def main():
                 if payload.get("fromMemory"):
                     log("   ℹ️ 已结清（本地记录），未重复上报")
                     report.append("账号%d %s: ℹ️ 新手任务已结清" % (index, account["note"]))
-                elif payload.get("ok"):
+                elif payload.get("status") == "confirmed":
                     tail = "（此前已完成）" if payload.get("already") else ""
-                    log("   ✅ 已上报 %s%s" % (claim_key, tail))
+                    log("   ✅ 回读确认 %s%s" % (claim_key, tail))
                     report.append("账号%d %s: ✅ %s%s" % (index, account["note"], claim_key, tail))
+                elif payload.get("status") == "already_done":
+                    log("   ✅ 回读确认 %s 已完成，无需重复领取" % claim_key)
+                    report.append("账号%d %s: ✅ %s 已完成" % (index, account["note"], claim_key))
+                elif payload.get("status") == "unconfirmed":
+                    reason = payload.get("readbackError") or payload.get("error") or "回读失败"
+                    log("   ⚠️ %s 领取结果未确认: %s" % (claim_key, reason))
+                    report.append("账号%d %s: ⚠️ %s 结果未确认" % (index, account["note"], claim_key))
+                elif payload.get("status") == "pending":
+                    reason = payload.get("error") or "回读任务状态未变化"
+                    log("   ⏳ %s 仍待处理: %s" % (claim_key, reason))
+                    report.append("账号%d %s: ⏳ %s 仍待处理" % (index, account["note"], claim_key))
                 else:
                     log("   ❌ %s 领取失败: %s" % (claim_key, payload.get("error") or "未知错误"))
                     report.append("账号%d %s: ❌ %s 领取失败" % (index, account["note"], claim_key))
