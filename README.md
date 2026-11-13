@@ -6,6 +6,8 @@
 
 **刷新 Loomy 每日赠送积分，并领取 8 项新手任务奖励的单文件自动化脚本。**
 
+> 当前版本：**v1.0.4**（2026-11-12） · 最新更新：批量与单条领取均执行领取前后任务清单回读
+
 [简体中文](README.md) · [English](docs/README.en.md) · [繁體中文](docs/README.zh-Hant.md) · [日本語](docs/README.ja.md) · [한국어](docs/README.ko.md) · [Português (BR)](docs/README.pt-BR.md)
 
 <p>
