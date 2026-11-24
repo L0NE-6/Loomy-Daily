@@ -4,6 +4,8 @@ Loomy의 일일 선물 포인트를 갱신하고 8개 온보딩 작업 보상을
 
 [简体中文](../README.md) · [English](README.en.md) · [繁體中文](README.zh-Hant.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [Português (BR)](README.pt-BR.md)
 
+**현재 버전:** v1.0.4
+
 전체 중국어 문서는 [../README.md](../README.md)에서 확인하세요.
 
 ## 주요 기능
